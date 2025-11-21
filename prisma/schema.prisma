@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Stores the account information for all players.
+model Player {
+  id                 Int               @id @default(autoincrement())
+  email              String            @unique
+  password           String
+  displayName        String            @map("display_name")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  currentTurnSession GameSession?      @relation("CurrentTurnInSession")
+  hostedSessions     GameSession[]     @relation("HostOfSession")
+  matchHistoriesWon  MatchHistory[]    @relation("WinnerOfMatch")
+  sessionsInGame     PlayerInSession[]
+  results            PlayerResult[]
+
+  @@map("players")
+}
+
+/// Stores the account information for all administrators.
+model Admin {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  password        String
+  displayName     String   @map("display_name")
+  permissionLevel String   @map("permission_level")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("admins")
+}
+
+/// Stores information for each game instance (room), from lobby to completion.
+model GameSession {
+  id                  Int                 @id @default(autoincrement())
+  roomName            String              @map("room_name")
+  maxPlayers          Int                 @map("max_players")
+  duration            String
+  access              String
+  code                String?
+  status              String
+  economicStatus      String              @map("economic_status")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  hostPlayerId        Int
+  currentTurnPlayerId Int?                @unique
+  activities          Activity[]
+  currentTurnPlayer   Player?             @relation("CurrentTurnInSession", fields: [currentTurnPlayerId], references: [id])
+  host                Player              @relation("HostOfSession", fields: [hostPlayerId], references: [id])
+  matchHistory        MatchHistory?
+  players             PlayerInSession[]
+  assetStates         SessionAssetState[]
+
+  @@map("game_sessions")
+}
+
+/// Stores the state of each player within a specific game session.
+model PlayerInSession {
+  id                Int           @id @default(autoincrement())
+  playerId          Int
+  sessionId         Int
+  careerId          Int?
+  goalId            Int?
+  readyStatus       String        @default("not_ready") @map("ready_status")
+  joinedAt          DateTime      @default(now()) @map("joined_at")
+  cash              Decimal       @default(0) @db.Decimal(18, 2)
+  savings           Decimal       @default(0) @db.Decimal(18, 2)
+  passiveIncome     Decimal       @default(0) @map("passive_income") @db.Decimal(18, 2)
+  happinessScore    Int           @default(0) @map("happiness_score")
+  healthScore       Int           @default(0) @map("health_score")
+  learningScore     Int           @default(0) @map("learning_score")
+  relationshipScore Int           @default(0) @map("relationship_score")
+  boardPosition     Int           @default(0) @map("board_position")
+  turnOrder         Int?          @map("turn_order")
+  riskScore         Int           @default(0) @map("risk_score")
+  creditScore       Int           @default(0) @map("credit_score")
+  savingScore       Int           @default(0) @map("saving_score")
+  investingScore    Int           @default(0) @map("investing_score")
+  debtMgmtScore     Int           @default(0) @map("debt_mgmt_score")
+  spendingScore     Int           @default(0) @map("spending_score")
+  incomeMgmtScore   Int           @default(0) @map("income_mgmt_score")
+  activities        Activity[]
+  assets            PlayerAsset[]
+  debts             PlayerDebt[]
+  career            Career?       @relation(fields: [careerId], references: [id])
+  goal              Goal?         @relation(fields: [goalId], references: [id])
+  player            Player        @relation(fields: [playerId], references: [id])
+  session           GameSession   @relation(fields: [sessionId], references: [id])
+
+  @@map("player_in_sessions")
+}
+
+/// The catalog of all available starting careers.
+model Career {
+  id               Int                  @id @default(autoincrement())
+  name             String               @unique @map("career_name")
+  baseSalary       Decimal              @map("base_salary") @db.Decimal(18, 2)
+  startingCash     Decimal              @map("starting_cash") @db.Decimal(18, 2)
+  startingSavings  Decimal              @map("starting_savings") @db.Decimal(18, 2)
+  description      String
+  startingExpenses CareerExpense[]
+  startingDebts    CareerStartingDebt[]
+  playersInSession PlayerInSession[]
+
+  @@map("careers")
+}
+
+/// Stores fixed expenses for each career.
+model CareerExpense {
+  id       Int     @id @default(autoincrement())
+  name     String  @map("expense_name")
+  amount   Decimal @db.Decimal(18, 2)
+  careerId Int
+  career   Career  @relation(fields: [careerId], references: [id])
+
+  @@map("career_expenses")
+}
+
+/// Stores starting debts for each career.
+model CareerStartingDebt {
+  id              Int     @id @default(autoincrement())
+  name            String  @map("debt_name")
+  principalAmount Decimal @map("principal_amount") @db.Decimal(18, 2)
+  careerId        Int
+  career          Career  @relation(fields: [careerId], references: [id])
+
+  @@map("career_starting_debts")
+}
+
+/// The catalog of all available goals.
+model Goal {
+  id               Int               @id @default(autoincrement())
+  name             String            @map("goal_name")
+  description      String
+  type             String            @map("goal_type")
+  playersInSession PlayerInSession[]
+
+  @@map("goals")
+}
+
+/// The catalog of all available assets.
+model Asset {
+  id             Int                 @id @default(autoincrement())
+  name           String              @unique @map("asset_name")
+  type           String              @map("asset_type")
+  cost           Decimal             @db.Decimal(18, 2)
+  cashFlow       Decimal             @map("cash_flow") @db.Decimal(18, 2)
+  description    String
+  ownedByPlayers PlayerAsset[]
+  sessionStates  SessionAssetState[]
+
+  @@map("assets")
+}
+
+/// The catalog of all available starting debt types.
+model Debt {
+  id              Int          @id @default(autoincrement())
+  name            String       @unique @map("debt_name")
+  principalAmount Decimal      @map("principal_amount") @db.Decimal(18, 2)
+  monthlyPayment  Decimal      @map("monthly_payment") @db.Decimal(18, 2)
+  heldByPlayers   PlayerDebt[]
+
+  @@map("debts")
+}
+
+/// The catalog of all event cards.
+model Card {
+  id          Int        @id @default(autoincrement())
+  type        String     @map("card_type")
+  title       String
+  description String
+  effectData  Json       @map("effect_data")
+  gameLevel   String     @map("game_level")
+  activities  Activity[]
+
+  @@map("cards")
+}
+
+/// The catalog of all spaces on the game board.
+model BoardSpace {
+  id       Int    @id @default(autoincrement())
+  position Int    @unique @map("board_position")
+  type     String @map("space_type")
+
+  @@map("board_spaces")
+}
+
+/// Records which player owns which asset in a session.
+model PlayerAsset {
+  id                Int             @id @default(autoincrement())
+  quantity          Int
+  purchasePrice     Decimal         @map("purchase_price") @db.Decimal(18, 2)
+  playerInSessionId Int
+  assetId           Int
+  asset             Asset           @relation(fields: [assetId], references: [id])
+  playerInSession   PlayerInSession @relation(fields: [playerInSessionId], references: [id])
+
+  @@map("player_assets")
+}
+
+/// Records which player has which debt in a session.
+model PlayerDebt {
+  id                 Int             @id @default(autoincrement())
+  name               String          @map("debt_name")
+  remainingPrincipal Decimal         @map("remaining_principal") @db.Decimal(18, 2)
+  monthlyPayment     Decimal         @map("monthly_payment") @db.Decimal(18, 2)
+  playerInSessionId  Int
+  debtId             Int?
+  debt               Debt?           @relation(fields: [debtId], references: [id])
+  playerInSession    PlayerInSession @relation(fields: [playerInSessionId], references: [id])
+
+  @@map("player_debts")
+}
+
+/// Tracks the dynamic price of each asset within a specific game session.
+model SessionAssetState {
+  currentPrice Decimal     @map("current_price") @db.Decimal(18, 2)
+  isAvailable  Boolean     @default(true) @map("is_available")
+  sessionId    Int
+  assetId      Int
+  asset        Asset       @relation(fields: [assetId], references: [id])
+  session      GameSession @relation(fields: [sessionId], references: [id])
+
+  @@id([sessionId, assetId])
+  @@map("session_asset_states")
+}
+
+/// A log of every significant event that occurs during a game session.
+model Activity {
+  id                Int             @id @default(autoincrement())
+  turnNumber        Int             @map("turn_number")
+  type              String          @map("activity_type")
+  description       String
+  dataPayload       Json            @map("data_payload")
+  timestamp         DateTime        @default(now())
+  sessionId         Int
+  playerInSessionId Int
+  cardId            Int?
+  card              Card?           @relation(fields: [cardId], references: [id])
+  playerInSession   PlayerInSession @relation(fields: [playerInSessionId], references: [id])
+  session           GameSession     @relation(fields: [sessionId], references: [id])
+
+  @@map("activities")
+}
+
+/// Stores a summary of each completed game session.
+model MatchHistory {
+  id             Int            @id @default(autoincrement())
+  totalTurns     Int            @map("total_turns")
+  endTimestamp   DateTime       @map("end_timestamp")
+  sessionId      Int            @unique
+  winnerPlayerId Int
+  session        GameSession    @relation(fields: [sessionId], references: [id])
+  winner         Player         @relation("WinnerOfMatch", fields: [winnerPlayerId], references: [id])
+  playerResults  PlayerResult[]
+
+  @@map("match_histories")
+}
+
+/// Stores a snapshot of each player's final state at the end of a match.
+model PlayerResult {
+  id                     Int          @id @default(autoincrement())
+  rank                   Int
+  finalNetWorth          Decimal      @map("final_net_worth") @db.Decimal(18, 2)
+  finalPassiveIncome     Decimal      @map("final_passive_income") @db.Decimal(18, 2)
+  finalHappinessScore    Int          @map("final_happiness_score")
+  finalHealthScore       Int          @map("final_health_score")
+  finalLearningScore     Int          @map("final_learning_score")
+  finalRelationshipScore Int          @map("final_relationship_score")
+  finalRiskScore         Int          @map("final_risk_score")
+  finalCreditScore       Int          @map("final_credit_score")
+  finalSavingScore       Int          @map("final_saving_score")
+  finalInvestingScore    Int          @map("final_investing_score")
+  finalDebtMgmtScore     Int          @map("final_debt_mgmt_score")
+  finalSpendingScore     Int          @map("final_spending_score")
+  finalIncomeMgmtScore   Int          @map("final_income_mgmt_score")
+  matchId                Int
+  playerId               Int
+  match                  MatchHistory @relation(fields: [matchId], references: [id])
+  player                 Player       @relation(fields: [playerId], references: [id])
+
+  @@map("player_results")
+}

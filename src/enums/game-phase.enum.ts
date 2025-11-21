@@ -1,0 +1,9 @@
+export enum GamePhase {
+  ROLL = 'ROLL',
+  MOVE = 'MOVE',
+  EVENT = 'EVENT',
+  DECISION = 'DECISION',
+  STATUS_UPDATE = 'STATUS_UPDATE',
+  CHECK = 'CHECK',
+  END_TURN = 'END_TURN',
+}

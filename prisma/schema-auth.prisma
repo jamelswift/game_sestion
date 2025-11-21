@@ -1,0 +1,22 @@
+/// Prisma schema สำหรับทดสอบ Authentication เท่านั้น
+/// ใช้ SQLite สำหรับความสะดวกในการทดสอบ
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Stores the account information for all players (สำหรับ Authentication)
+model Player {
+  id          Int      @id @default(autoincrement())
+  email       String   @unique
+  password    String
+  displayName String   @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("players")
+}
