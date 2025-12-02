@@ -2,8 +2,10 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Prisma 6.17.1 - url property is supported (ignore Prisma 7 warning from extension)
 datasource db {
   provider = "postgresql"
+  // @prisma-ignore-error
   url      = env("DATABASE_URL")
 }
 
